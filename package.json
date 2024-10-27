@@ -1,0 +1,23 @@
+{
+    "name": "platform-one",
+    "version": "1.0.0",
+    "private": true,
+    "workspaces": [
+      "apps/*",
+      "packages/*"
+    ],
+    "scripts": {
+      "dev": "turbo run dev",
+      "build": "turbo run build",
+      "start": "turbo run start",
+      "test": "turbo run test",
+      "lint": "turbo run lint",
+      "clean": "turbo run clean"
+    },
+    "devDependencies": {
+      "turbo": "^1.10.0",
+      "typescript": "^5.0.4",
+      "prettier": "^2.8.8",
+      "@types/node": "^18.0.0"
+    }
+  }
