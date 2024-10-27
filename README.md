@@ -32,19 +32,19 @@ platform-one/
 │   ├── frontend/                    # React Frontend Application
 │   │   ├── src/
 │   │   │   ├── components/         # Reusable UI components
-│   │   │   │   ├── common/        # Generic components
-│   │   │   │   ├── layout/        # Layout components
-│   │   │   │   └── ui/           # Basic UI elements
-│   │   │   ├── features/          # Feature-specific modules
-│   │   │   │   ├── services/     # Service management
-│   │   │   │   ├── monitoring/   # Monitoring dashboards
-│   │   │   │   ├── deployments/  # Deployment management
-│   │   │   │   └── settings/     # Platform settings
-│   │   │   ├── hooks/            # Custom React hooks
-│   │   │   ├── pages/            # Page components
-│   │   │   ├── services/         # API services
-│   │   │   ├── store/            # State management
-│   │   │   └── utils/            # Utility functions
+│   │   │   │   ├── common/         # Generic components
+│   │   │   │   ├── layout/         # Layout components
+│   │   │   │   └── ui/             # Basic UI elements
+│   │   │   ├── features/           # Feature-specific modules
+│   │   │   │   ├── services/       # Service management
+│   │   │   │   ├── monitoring/     # Monitoring dashboards
+│   │   │   │   ├── deployments/    # Deployment management
+│   │   │   │   └── settings/       # Platform settings
+│   │   │   ├── hooks/              # Custom React hooks
+│   │   │   ├── pages/              # Page components
+│   │   │   ├── services/           # API services
+│   │   │   ├── store/              # State management
+│   │   │   └── utils/              # Utility functions
 │   │
 │   └── backend/                     # Node.js Backend Application
 │       ├── src/
