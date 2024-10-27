@@ -1,0 +1,62 @@
+# configs/dev/app.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: platform-config
+  namespace: platform-dev
+data:
+  # Application Settings
+  APP_NAME: "Platform One - Dev"
+  ENVIRONMENT: "development"
+  LOG_LEVEL: "debug"
+  
+  # Frontend Configuration
+  FRONTEND_URL: "http://localhost:3000"
+  API_BASE_URL: "http://localhost:8000"
+  WEBSOCKET_URL: "ws://localhost:8000"
+  ENABLE_MOCK_DATA: "true"
+  
+  # Backend Configuration
+  PORT: "8000"
+  API_VERSION: "v1"
+  CORS_ORIGIN: "http://localhost:3000"
+  MAX_REQUEST_SIZE: "10mb"
+  RATE_LIMIT_WINDOW: "15m"
+  RATE_LIMIT_MAX: "100"
+  
+  # Database Configuration
+  DB_HOST: "localhost"
+  DB_PORT: "5432"
+  DB_NAME: "platform_dev"
+  
+  # Cache Configuration
+  REDIS_HOST: "localhost"
+  REDIS_PORT: "6379"
+  
+  # Feature Flags
+  ENABLE_NEW_DASHBOARD: "true"
+  ENABLE_BETA_FEATURES: "true"
+  ENABLE_DEBUG_TOOLS: "true"
+
+# configs/dev/secrets.yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: platform-secrets
+  namespace: platform-dev
+type: Opaque
+data:
+  # Database Credentials
+  DB_USER: cGxhdGZvcm1fZGV2  # platform_dev
+  DB_PASSWORD: ZGV2X3Bhc3N3b3Jk  # dev_password
+  
+  # JWT Configuration
+  JWT_SECRET: ZGV2X3NlY3JldF9rZXk=  # dev_secret_key
+  JWT_EXPIRY: "24h"
+  
+  # API Keys
+  GITHUB_API_KEY: Z2l0aHViX2Rldl9rZXk=  # github_dev_key
+  SLACK_WEBHOOK_URL: aHR0cHM6Ly9ob29rcy5zbGFjay5jb20vc2VydmljZXMvZGV2  # slack webhook
+  
+  # Service Accounts
+  SERVICE_ACCOUNT_KEY: c2VydmljZV9hY2NvdW50X2Rldg==  # service_account_dev
