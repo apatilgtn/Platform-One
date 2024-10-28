@@ -1,90 +1,150 @@
-// platform-one/setup.ps1
-# Setup script for Platform One
+# setup.ps1
 
-Write-Host "Setting up Platform One Development Environment..." -ForegroundColor Blue
-
-# Check prerequisites
-function Test-Command($cmdname) {
-    return [bool](Get-Command -Name $cmdname -ErrorAction SilentlyContinue)
+function Write-ColorOutput($ForegroundColor) {
+    $fc = $host.UI.RawUI.ForegroundColor
+    $host.UI.RawUI.ForegroundColor = $ForegroundColor
+    if ($args) {
+        Write-Output $args
+    }
+    $host.UI.RawUI.ForegroundColor = $fc
 }
 
-if (-not (Test-Command node)) {
-    Write-Host "Node.js is required but not installed. Aborting." -ForegroundColor Red
-    exit 1
+function Wait-ForPostgres {
+    Write-ColorOutput Yellow "Waiting for PostgreSQL to be ready..."
+    $maxAttempts = 30
+    $attempt = 0
+    $ready = $false
+
+    while (-not $ready -and $attempt -lt $maxAttempts) {
+        try {
+            $attempt++
+            $result = docker-compose exec postgres pg_isready -U platform_dev
+            if ($LASTEXITCODE -eq 0) {
+                $ready = $true
+                Write-ColorOutput Green "PostgreSQL is ready!"
+            } else {
+                Write-ColorOutput Yellow "Waiting for PostgreSQL... (Attempt $attempt/$maxAttempts)"
+                Start-Sleep -Seconds 2
+            }
+        } catch {
+            Write-ColorOutput Yellow "Waiting for PostgreSQL... (Attempt $attempt/$maxAttempts)"
+            Start-Sleep -Seconds 2
+        }
+    }
+
+    if (-not $ready) {
+        throw "PostgreSQL failed to start within the allowed time"
+    }
 }
 
-if (-not (Test-Command docker)) {
-    Write-Host "Docker is required but not installed. Aborting." -ForegroundColor Red
-    exit 1
+# Stop and remove existing containers
+Write-ColorOutput Yellow "Cleaning up existing Docker containers..."
+docker-compose down -v
+
+# Remove existing node_modules and build artifacts
+Write-ColorOutput Yellow "Cleaning up existing build artifacts..."
+Remove-Item -Recurse -Force -ErrorAction SilentlyContinue apps/backend/node_modules
+Remove-Item -Recurse -Force -ErrorAction SilentlyContinue apps/frontend/node_modules
+Remove-Item -Recurse -Force -ErrorAction SilentlyContinue apps/backend/prisma/migrations
+Remove-Item -Force -ErrorAction SilentlyContinue apps/backend/.env
+Remove-Item -Force -ErrorAction SilentlyContinue apps/frontend/.env
+
+# Create Prisma schema
+Write-ColorOutput Yellow "Creating Prisma schema..."
+$prismaSchema = @'
+generator client {
+  provider = "prisma-client-js"
 }
 
-# Create directories
-Write-Host "Creating project structure..." -ForegroundColor Blue
-$dirs = @(
-    "apps/frontend/src",
-    "apps/backend/src",
-    "packages/common/src",
-    "configs/dev",
-    "infrastructure"
-)
-
-foreach ($dir in $dirs) {
-    New-Item -ItemType Directory -Path $dir -Force | Out-Null
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String
+  password  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Service {
+  id          String   @id @default(cuid())
+  name        String
+  description String
+  repository  String
+  status      String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+'@
+
+# Ensure Prisma directory exists
+New-Item -ItemType Directory -Force -Path "apps/backend/prisma" | Out-Null
+$prismaSchema | Out-File -FilePath "apps/backend/prisma/schema.prisma" -Encoding UTF8
 
 # Create environment files
-Write-Host "Creating environment files..." -ForegroundColor Blue
-
-# Root .env
-@"
-DB_USER=platform_dev
-DB_PASSWORD=dev_password
-DB_NAME=platform_dev
-JWT_SECRET=dev_secret_key
-NODE_ENV=development
-"@ | Out-File -FilePath ".env" -Encoding UTF8
-
-# Frontend .env
-@"
-VITE_API_URL=http://localhost:8000
-VITE_WS_URL=ws://localhost:8000
-"@ | Out-File -FilePath "apps/frontend/.env" -Encoding UTF8
+Write-ColorOutput Yellow "Creating environment files..."
 
 # Backend .env
-@"
+$backendEnv = @"
+DATABASE_URL="postgresql://platform_dev:dev_password@localhost:5432/platform_dev"
+JWT_SECRET="dev_secret_key"
 PORT=8000
-DATABASE_URL=postgresql://platform_dev:dev_password@localhost:5432/platform_dev
-REDIS_URL=redis://localhost:6379
-JWT_SECRET=dev_secret_key
-"@ | Out-File -FilePath "apps/backend/.env" -Encoding UTF8
+"@
+$backendEnv | Out-File -FilePath "apps/backend/.env" -Encoding UTF8
 
-# Install dependencies
-Write-Host "Installing dependencies..." -ForegroundColor Blue
-npm install
+# Frontend .env
+$frontendEnv = @"
+VITE_API_URL=http://localhost:8000
+"@
+$frontendEnv | Out-File -FilePath "apps/frontend/.env" -Encoding UTF8
 
 # Start Docker services
-Write-Host "Starting Docker services..." -ForegroundColor Blue
-docker-compose up -d
+Write-ColorOutput Yellow "Starting Docker services..."
+docker-compose up -d postgres
 
-# Wait for services
-Write-Host "Waiting for services to be ready..." -ForegroundColor Blue
-Start-Sleep -Seconds 10
+# Wait for PostgreSQL
+Wait-ForPostgres
 
-# Setup database
-Write-Host "Setting up database..." -ForegroundColor Blue
-Push-Location apps/backend
-npm run prisma:generate
-npm run prisma:migrate
-Pop-Location
+# Install dependencies and initialize database
+Write-ColorOutput Yellow "Installing dependencies and initializing database..."
+try {
+    # Install backend dependencies
+    Set-Location apps/backend
+    npm install
+    
+    # Initialize Prisma
+    Write-ColorOutput Yellow "Generating Prisma client..."
+    npx prisma generate
+    if ($LASTEXITCODE -ne 0) { throw "Prisma generate failed" }
 
-# Build packages
-Write-Host "Building packages..." -ForegroundColor Blue
-npm run build
+    # Run migrations
+    Write-ColorOutput Yellow "Running database migrations..."
+    npx prisma migrate dev --name init
+    if ($LASTEXITCODE -ne 0) { throw "Prisma migrations failed" }
+    
+    Set-Location ../..
+    
+    # Install frontend dependencies
+    Set-Location apps/frontend
+    npm install
+    Set-Location ../..
 
-Write-Host "`nSetup complete! You can now start the development servers:" -ForegroundColor Green
-Write-Host "1. Frontend: " -NoNewline
-Write-Host "npm run dev --workspace=@platform-one/frontend" -ForegroundColor Blue
-Write-Host "2. Backend: " -NoNewline
-Write-Host "npm run dev --workspace=@platform-one/backend" -ForegroundColor Blue
-Write-Host "`nOr use Docker Compose:"
-Write-Host "docker-compose up" -ForegroundColor Blue
+} catch {
+    Write-ColorOutput Red "Error during setup: $_"
+    Write-ColorOutput Yellow "Cleaning up..."
+    docker-compose down -v
+    exit 1
+}
+
+Write-ColorOutput Green "`nSetup completed successfully!"
+Write-ColorOutput Yellow "To start the development servers:"
+Write-ColorOutput White "1. Frontend (in a new terminal):"
+Write-ColorOutput White "   cd apps/frontend && npm run dev"
+Write-ColorOutput White "2. Backend (in a new terminal):"
+Write-ColorOutput White "   cd apps/backend && npm run dev"
+Write-ColorOutput Yellow "`nTo verify the database setup:"
+Write-ColorOutput White "   cd apps/backend && npx prisma studio"
